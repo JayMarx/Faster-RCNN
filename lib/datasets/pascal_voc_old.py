@@ -1,11 +1,9 @@
-# -*- coding:utf-8 -*-
 # --------------------------------------------------------
 # Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
 # Written by Ross Girshick
 # --------------------------------------------------------
-
 
 import os
 from datasets.imdb import imdb
@@ -29,19 +27,14 @@ class pascal_voc(imdb):
         self._devkit_path = self._get_default_path() if devkit_path is None \
                             else devkit_path
         self._data_path = os.path.join(self._devkit_path, 'VOC' + self._year)
-        '''
         self._classes = ('__background__', # always index 0
                          'aeroplane', 'bicycle', 'bird', 'boat',
                          'bottle', 'bus', 'car', 'cat', 'chair',
                          'cow', 'diningtable', 'dog', 'horse',
                          'motorbike', 'person', 'pottedplant',
                          'sheep', 'sofa', 'train', 'tvmonitor')
-        '''
-	self._classes = ('__background__', # always index 0
-                         'car', 'pedestrian')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
-        #self._image_ext = '.jpg'
-        self._image_ext = '.png'	#png格式
+        self._image_ext = '.jpg'
         self._image_index = self._load_image_set_index()
         # Default to roidb handler
         self._roidb_handler = self.selective_search_roidb
@@ -49,8 +42,7 @@ class pascal_voc(imdb):
         self._comp_id = 'comp4'
 
         # PASCAL specific config options
-        #cleanup设为False，使得保存测试结果到/VOCdevkit/results/VOC2007/Main
-        self.config = {'cleanup'     : False,
+        self.config = {'cleanup'     : True,
                        'use_salt'    : True,
                        'use_diff'    : False,
                        'matlab_eval' : False,
@@ -193,11 +185,6 @@ class pascal_voc(imdb):
         filename = os.path.join(self._data_path, 'Annotations', index + '.xml')
         tree = ET.parse(filename)
         objs = tree.findall('object')
-       
-        #for obj in objs:
-	#	print obj.find('name').text
-	#KITTI数据集没有difficult项，故不用检测difficult
-        '''
         if not self.config['use_diff']:
             # Exclude the samples labeled as difficult
             non_diff_objs = [
@@ -206,57 +193,28 @@ class pascal_voc(imdb):
             #     print 'Removed {} difficult objects'.format(
             #         len(objs) - len(non_diff_objs))
             objs = non_diff_objs
-        '''     
-	#KITTI中有多余的object,比如Dontcare,Cyclist等，由于只训练Car和Pedestrian，这里不予考虑
-        if not self.config['use_diff']:
-            # Exclude the samples labeled as difficult
-            #[] 里面for循环，最终生成列表
-	    right_objs = [
-                obj for obj in objs if (obj.find('name').text.lower() == 'car') or (obj.find('name').text.lower() == 'pedestrian')]
-            objs = right_objs
-            #以下改写错误原因：每次循环结束后，right_objs都会被覆盖，不会形成列表
-        '''    
-            for obj in objs:
-            	if (obj.find('name').text == 'Car') or (obj.find('name').text == 'Pedestrian'):
-			print obj.find('name').text                	
-			right_objs=[obj]
-            objs = right_objs
-        '''
-        #print '##################################'
-        #print ('num_objs')
-        #print num_objs
-	#for obj in objs:
-	#	print obj.find('name').text	
-   
         num_objs = len(objs)
+
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
         # "Seg" area for pascal is just the box area
         seg_areas = np.zeros((num_objs), dtype=np.float32)
-        
-        #k=1
+
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
             bbox = obj.find('bndbox')
             # Make pixel indexes 0-based
-	    # KITTI数据集从0开始，因此不用-1
-            x1 = float(bbox.find('xmin').text)
-            y1 = float(bbox.find('ymin').text)
-            x2 = float(bbox.find('xmax').text)
-            y2 = float(bbox.find('ymax').text)
-    
+            x1 = float(bbox.find('xmin').text) - 1
+            y1 = float(bbox.find('ymin').text) - 1
+            x2 = float(bbox.find('xmax').text) - 1
+            y2 = float(bbox.find('ymax').text) - 1
             cls = self._class_to_ind[obj.find('name').text.lower().strip()]
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
             seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
-            #print('k:')
-            #print k
-            #k +=1
-            #print('ix:')
-            #print ix
-          
+
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
         return {'boxes' : boxes,
@@ -368,8 +326,8 @@ class pascal_voc(imdb):
             for cls in self._classes:
                 if cls == '__background__':
                     continue
-                filename = self._get_voc_results_file_template().format(cls)                
-		#os.remove(filename)
+                filename = self._get_voc_results_file_template().format(cls)
+                os.remove(filename)
 
     def competition_mode(self, on):
         if on:
@@ -381,8 +339,6 @@ class pascal_voc(imdb):
 
 if __name__ == '__main__':
     from datasets.pascal_voc import pascal_voc
-    #d = pascal_voc('trainval', '2007')
-    #改用KITTI数据分配形式，用train.txt
-    d = pascal_voc('train', '2007')
+    d = pascal_voc('trainval', '2007')
     res = d.roidb
     from IPython import embed; embed()

@@ -257,6 +257,8 @@ def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
         _t['im_detect'].tic()
         scores, boxes = im_detect(net, im, box_proposals)
         _t['im_detect'].toc()
+        
+        return
         _t['misc'].tic()
         # skip j = 0, because it's the background class
         for j in xrange(1, imdb.num_classes):

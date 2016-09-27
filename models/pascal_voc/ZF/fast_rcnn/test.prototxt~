@@ -8,10 +8,10 @@ input_shape {
   dim: 224
 }
 
-input: "im_info"
+input: "rois"
 input_shape {
-  dim: 1
-  dim: 3
+  dim: 1 # to be changed on-the-fly to num ROIs
+  dim: 5 # [batch ind, x1, y1, x2, y2] zero-based indexing
 }
 
 #========= conv1-conv5 ============
@@ -157,128 +157,6 @@ layer {
 	top: "conv5"
 }
 
-#========= RPN ============
-
-layer {
-  name: "rpn_conv/3x3"
-  type: "Convolution"
-  bottom: "conv5"
-  top: "rpn/output"
-  convolution_param {
-    num_output: 256
-    kernel_size: 3 pad: 1 stride: 1
-    weight_filler { type: "gaussian" std: 0.01 }
-    bias_filler { type: "constant" value: 0 }
-  }
-}
-layer {
-  name: "rpn_relu/3x3"
-  type: "ReLU"
-  bottom: "rpn/output"
-  top: "rpn/output"
-}
-#layer {
-#  name: "rpn_conv/3x3"
-#  type: "Convolution"
-#  bottom: "conv5"
-#  top: "rpn_conv/3x3"
-#  param { lr_mult: 1.0 decay_mult: 1.0 }
-#  param { lr_mult: 2.0 decay_mult: 0 }
-#  convolution_param {
-#    num_output: 192
-#    kernel_size: 3 pad: 1 stride: 1
-#    weight_filler { type: "gaussian" std: 0.01 }
-#    bias_filler { type: "constant" value: 0 }
-#  }
-#}
-#layer {
-#  name: "rpn_conv/5x5"
-#  type: "Convolution"
-#  bottom: "conv5"
-#  top: "rpn_conv/5x5"
-#  param { lr_mult: 1.0 decay_mult: 1.0 }
-#  param { lr_mult: 2.0 decay_mult: 0 }
-#  convolution_param {
-#    num_output: 64
-#    kernel_size: 5 pad: 2 stride: 1
-#    weight_filler { type: "gaussian" std: 0.0036 }
-#    bias_filler { type: "constant" value: 0 }
-#  }
-#}
-#layer {
-#  name: "rpn/output"
-#  type: "Concat"
-#  bottom: "rpn_conv/3x3"
-#  bottom: "rpn_conv/5x5"
-#  top: "rpn/output"
-#}
-#layer {
-#  name: "rpn_relu/output"
-#  type: "ReLU"
-#  bottom: "rpn/output"
-#  top: "rpn/output"
-#}
-layer {
-  name: "rpn_cls_score"
-  type: "Convolution"
-  bottom: "rpn/output"
-  top: "rpn_cls_score"
-  convolution_param {
-    num_output: 18   # 2(bg/fg) * 9(anchors)
-    kernel_size: 1 pad: 0 stride: 1
-    weight_filler { type: "gaussian" std: 0.01 }
-    bias_filler { type: "constant" value: 0 }
-  }
-}
-layer {
-  name: "rpn_bbox_pred"
-  type: "Convolution"
-  bottom: "rpn/output"
-  top: "rpn_bbox_pred"
-  convolution_param {
-    num_output: 36   # 4 * 9(anchors)
-    kernel_size: 1 pad: 0 stride: 1
-    weight_filler { type: "gaussian" std: 0.01 }
-    bias_filler { type: "constant" value: 0 }
-  }
-}
-layer {
-   bottom: "rpn_cls_score"
-   top: "rpn_cls_score_reshape"
-   name: "rpn_cls_score_reshape"
-   type: "Reshape"
-   reshape_param { shape { dim: 0 dim: 2 dim: -1 dim: 0 } }
-}
-
-#========= RoI Proposal ============
-
-layer {
-  name: "rpn_cls_prob"
-  type: "Softmax"
-  bottom: "rpn_cls_score_reshape"
-  top: "rpn_cls_prob"
-}
-layer {
-  name: 'rpn_cls_prob_reshape'
-  type: 'Reshape'
-  bottom: 'rpn_cls_prob'
-  top: 'rpn_cls_prob_reshape'
-  reshape_param { shape { dim: 0 dim: 18 dim: -1 dim: 0 } }
-}
-layer {
-  name: 'proposal'
-  type: 'Python'
-  bottom: 'rpn_cls_prob_reshape'
-  bottom: 'rpn_bbox_pred'
-  bottom: 'im_info'
-  top: 'rois'
-  python_param {
-    module: 'rpn.proposal_layer'
-    layer: 'ProposalLayer'
-    param_str: "'feat_stride': 16"
-  }
-}
-
 #========= RCNN ============
 
 layer {
@@ -349,7 +227,7 @@ layer {
   bottom: "fc7"
   top: "cls_score"
   inner_product_param {
-    num_output: 3
+    num_output: 21
   }
 }
 layer {
@@ -358,7 +236,7 @@ layer {
   bottom: "fc7"
   top: "bbox_pred"
   inner_product_param {
-    num_output: 12
+    num_output: 84
   }
 }
 layer {
